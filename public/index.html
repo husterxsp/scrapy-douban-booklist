@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Book</title>
+    <!-- element ui -->
+    <link rel="stylesheet" href="./static/css/index.css">
+    <style type="text/css">
+    #app {
+        width: 800px;
+        margin: 30px auto;
+    }
+
+    .input-container {
+        margin-left: 15px;
+        display: inline-block;
+    }
+
+    .el-input {
+        width: 150px;
+    }
+
+    a {
+        text-decoration: none;
+        color: #409eff;
+    }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        分类：
+        <el-cascader 
+            expand-trigger="hover" 
+            :options="options" 
+            v-model="selectedOptions" 
+            filterable
+            @change="handleChange">
+        </el-cascader>
+        <div class="input-container">
+            评分筛选:
+            <el-input v-model="score"></el-input>
+        </div>
+        <div class="input-container">
+            评论数筛选:
+            <el-input v-model="comment"></el-input>
+        </div>
+        <el-table :data="tableData" v-loading="loading" :default-sort="{prop: 'score', order: 'descending'}">
+            <el-table-column prop="name" label="书名" sortable width="180"></el-table-column>
+            <el-table-column prop="score" label="评分" sortable width="120"></el-table-column>
+            <el-table-column prop="comment_num" label="评论数" sortable width="120"></el-table-column>
+            <el-table-column prop="description" label="描述" width="280"></el-table-column>
+            <el-table-column fixed="right" label="操作">
+                <template slot-scope="scope">
+                    <a :href="scope.row.url" class="">查看</a>
+                </template>
+            </el-table-column>
+        </el-table>
+    </div>
+    <script src="./static/js/vue.js"></script>
+    <script src="./static/js/axios.min.js"></script>
+    <!-- element ui -->
+    <script src="./static/js/index.js"></script>
+    <script>
+    new Vue({
+        el: '#app',
+        data: function() {
+
+            this.getContents();
+            return {
+                options: [],
+                // 默认选项
+                selectedOptions: ['文学', '中国文学'],
+                score: 8.8,
+                // 取中位数
+                comment: 10,
+                data: [],
+                loading: false
+            }
+        },
+        computed: {
+            tableData: function() {
+                var data = this.data;
+                var score = this.score;
+                var comment = this.comment;
+
+                var res = data.filter(function(item) {
+                    return item.score >= score && item.comment_num >= comment;
+                });
+
+                return res;
+            }
+        },
+        methods: {
+            // 获取目录，并构造成element-ui 级联选择器的数据结构
+            getContents: function() {
+                var _this = this;
+
+                axios.get('./data/contents.json').then(function(res) {
+                    contests = res.data;
+                    options = [];
+                    for (tag_name in contests) {
+                        opt = {
+                            value: tag_name,
+                            label: tag_name,
+                            children: []
+                        };
+                        for (sub_tag_name in contests[tag_name]) {
+                            opt.children.push({
+                                value: sub_tag_name,
+                                label: sub_tag_name,
+                            });
+                        }
+                        options.push(opt);
+                    }
+
+                    _this.options = options;
+                });
+            },
+            handleChange(value) {
+                this.data = [];
+                this.tableData = [];
+
+                var _this = this;
+                var filename = './data/' + value[0] + '/' + value[1] + '.json';
+
+                _this.loading = true;
+                axios.get(filename).then(function(res) {
+                    _this.data = res.data;
+                    _this.loading = false;
+
+
+                    _this.data.sort(function(a, b) {
+                        if (a.score < b.score) return 1;
+                        else if (a.score == b.score && a.comment_num > b.comment_num) return 1;
+                        return -1;
+                    });
+
+                    // 分别获取分数和评论数数组
+                    var scoreArr = [], commentArr = [];
+                    _this.data.forEach(function(a) {
+                        scoreArr.push(a.score);
+                        commentArr.push(a.comment_num);
+                    });
+
+                    scoreArr.sort();
+                    commentArr.sort();
+
+                    var median = Math.ceil(_this.data.length * 0.8);
+                    _this.score = scoreArr[median] || 0;
+                    _this.comment = commentArr[median] || 0;
+
+                });  
+
+            }
+        },
+        mounted: function () {
+            this.handleChange(this.selectedOptions);
+        }
+    })
+    </script>
+</body>
+
+</html>
